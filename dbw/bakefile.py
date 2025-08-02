@@ -1,7 +1,7 @@
 """Docker Bake file generation for dbw."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 from jinja2 import Template
 
@@ -88,21 +88,21 @@ group "extensions" {
 
 class BakeFileGenerator:
     """Generates Docker Bake files for parallel builds."""
-    
+
     def __init__(self, worktree_path: Path, project_name: str) -> None:
         self.worktree_path = worktree_path
         self.project_name = project_name
         self.bake_file = worktree_path / "docker-bake.hcl"
-        
+
     def generate(
         self,
-        extensions: List[Dict[str, str]],
+        extensions: list[dict[str, str]],
         platform: str = "linux/amd64",
         cache_type: str = "local",
         registry: Optional[str] = None,
     ) -> Path:
         """Generate Bake file for the current setup.
-        
+
         Args:
             extensions: List of dicts with 'name', 'path', 'image_tag'
             platform: Target platform
@@ -110,17 +110,17 @@ class BakeFileGenerator:
             registry: Registry URL for registry cache
         """
         logger.info("bake.generate", file=str(self.bake_file), extensions=len(extensions))
-        
+
         template = Template(BAKE_HCL_TEMPLATE)
-        
+
         # Prepare template variables
         cache_dir = get_buildx_cache_dir()
         base_image_tag = f"dbw_base_{self.project_name}:latest"
-        
+
         # Use registry from env if not provided
         if not registry:
             registry = get_env("DBW_CACHE_REGISTRY") or ""
-        
+
         # Render template
         try:
             content = template.render(
@@ -132,50 +132,50 @@ class BakeFileGenerator:
                 base_image_tag=base_image_tag,
                 extensions=extensions,
             )
-            
+
             # Write file
             self.bake_file.write_text(content)
             logger.info("bake.generated", file=str(self.bake_file))
-            
+
             return self.bake_file
-            
+
         except Exception as e:
-            raise BakeFileError(f"Failed to generate bake file: {e}")
-    
+            raise BakeFileError(f"Failed to generate bake file: {e}") from e
+
     def validate(self) -> bool:
         """Validate generated bake file syntax."""
         if not self.bake_file.exists():
             return False
-        
+
         try:
             import subprocess
-            
+
             result = subprocess.run(
                 ["docker", "buildx", "bake", "--print", "-f", str(self.bake_file)],
                 capture_output=True,
                 text=True,
                 check=False,
             )
-            
+
             if result.returncode != 0:
                 logger.error("bake.validation_failed", error=result.stderr)
                 return False
-            
+
             logger.debug("bake.validated", file=str(self.bake_file))
             return True
-            
+
         except Exception as e:
             logger.error("bake.validation_error", error=str(e))
             return False
-    
+
     def build(
         self,
-        targets: Optional[List[str]] = None,
+        targets: Optional[list[str]] = None,
         load: bool = True,
         push: bool = False,
     ) -> None:
         """Execute Bake build.
-        
+
         Args:
             targets: Specific targets to build (default: all)
             load: Load images to local Docker
@@ -183,36 +183,36 @@ class BakeFileGenerator:
         """
         if not self.bake_file.exists():
             raise BakeFileError("Bake file not found. Run generate() first.")
-        
+
         cmd = ["docker", "buildx", "bake", "-f", str(self.bake_file)]
-        
+
         if targets:
             cmd.extend(targets)
-        
+
         if load:
             cmd.append("--load")
-        
+
         if push:
             cmd.append("--push")
-        
+
         logger.info("bake.build", command=" ".join(cmd))
-        
+
         try:
             import subprocess
-            
-            result = subprocess.run(cmd, check=True, cwd=self.worktree_path)
+
+            subprocess.run(cmd, check=True, cwd=self.worktree_path)
             logger.info("bake.build_success")
-            
+
         except subprocess.CalledProcessError as e:
-            raise BakeFileError(f"Bake build failed: {e}")
-        except FileNotFoundError:
-            raise BakeFileError("Docker buildx not found. Please install Docker Buildx.")
+            raise BakeFileError(f"Bake build failed: {e}") from e
+        except FileNotFoundError as exc:
+            raise BakeFileError("Docker buildx not found. Please install Docker Buildx.") from exc
 
 
 def setup_buildx_builder(builder_name: str = "dbw_builder") -> None:
     """Ensure Buildx builder exists and is active."""
     import subprocess
-    
+
     try:
         # Check if builder exists
         result = subprocess.run(
@@ -220,7 +220,7 @@ def setup_buildx_builder(builder_name: str = "dbw_builder") -> None:
             capture_output=True,
             check=False,
         )
-        
+
         if result.returncode != 0:
             # Create builder
             logger.info("buildx.create_builder", name=builder_name)
@@ -234,13 +234,13 @@ def setup_buildx_builder(builder_name: str = "dbw_builder") -> None:
                 ["docker", "buildx", "use", builder_name],
                 check=True,
             )
-        
+
         logger.info("buildx.builder_ready", name=builder_name)
-        
+
     except subprocess.CalledProcessError as e:
-        raise BakeFileError(f"Failed to setup Buildx builder: {e}")
-    except FileNotFoundError:
-        raise BakeFileError("Docker buildx not found. Please install Docker Buildx.")
+        raise BakeFileError(f"Failed to setup Buildx builder: {e}") from e
+    except FileNotFoundError as exc:
+        raise BakeFileError("Docker buildx not found. Please install Docker Buildx.") from exc
 
 
 def cleanup_bake_file(worktree_path: Path) -> None:

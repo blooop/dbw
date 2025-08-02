@@ -1,4 +1,6 @@
-from dbw.basic_class import BasicClass
+"""Example usage of dbw."""
 
-bc = BasicClass()
-print(bc.int_var)
+from dbw import __version__
+
+print(f"DBW version: {__version__}")
+print("Use 'dbw --help' to see available commands")

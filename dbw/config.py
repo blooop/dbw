@@ -2,18 +2,21 @@
 
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Optional
 
 from pydantic import BaseModel, Field
+
 
 # XDG Base Directory paths
 def get_data_home() -> Path:
     """Get XDG data home directory."""
     return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
 
+
 def get_config_home() -> Path:
-    """Get XDG config home directory.""" 
+    """Get XDG config home directory."""
     return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+
 
 def get_cache_home() -> Path:
     """Get XDG cache home directory."""
@@ -54,19 +57,19 @@ BAKE_FILE = "docker-bake.hcl"
 
 class RepoConfig(BaseModel):
     """Configuration loaded from .dbw.yml in repository."""
-    
-    extensions: List[str] = Field(default_factory=list)
+
+    extensions: list[str] = Field(default_factory=list)
     subfolder: Optional[str] = None
-    platforms: List[str] = Field(default_factory=lambda: ["linux/amd64"])
+    platforms: list[str] = Field(default_factory=lambda: ["linux/amd64"])
     base_image: Optional[str] = None
-    env: Dict[str, str] = Field(default_factory=dict)
-    volumes: List[str] = Field(default_factory=list)
-    ports: List[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    volumes: list[str] = Field(default_factory=list)
+    ports: list[str] = Field(default_factory=list)
 
 
 class CacheConfig(BaseModel):
     """Buildx cache configuration."""
-    
+
     type: str = "local"  # local, registry, inline
     registry_ref: Optional[str] = None
     local_dir: Optional[str] = None
@@ -75,13 +78,13 @@ class CacheConfig(BaseModel):
 
 class DbwConfig(BaseModel):
     """Global dbw configuration."""
-    
+
     base_image: str = ENV_DEFAULTS["DBW_BASE_IMAGE"]
     cache: CacheConfig = Field(default_factory=CacheConfig)
     builder_name: str = ENV_DEFAULTS["DBW_BUILDX_BUILDER"]
     auto_gpu: bool = True
     auto_x11: bool = True
-    
+
 
 def ensure_dirs() -> None:
     """Ensure all required directories exist."""

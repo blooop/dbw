@@ -1,20 +1,6 @@
-# dbw
-A template repo for python projects that is set up using [pixi](https://pixi.sh). 
+# DBW - Docker Buildx/Bake Worktree
 
-This has basic setup for
-
-* pylint
-* ruff
-* black
-* pytest
-* git-lfs
-* basic github actions ci
-* pulling updates from this template
-* codecov
-* pypi upload
-* dependabot
-
-## Continuous Integration Status
+Fast development containers with git worktree isolation and extension caching using Docker Buildx and Bake.
 
 [![Ci](https://github.com/blooop/dbw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/blooop/dbw/actions/workflows/ci.yml?query=branch%3Amain)
 [![Codecov](https://codecov.io/gh/blooop/dbw/branch/main/graph/badge.svg?token=Y212GW1PG6)](https://codecov.io/gh/blooop/dbw)
@@ -25,72 +11,243 @@ This has basic setup for
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 
+## Features
 
-# Install
+- 🚀 **Fast container startup** - Extensions cached across repos, no rebuilds
+- 🌿 **Git worktree isolation** - Switch branches without committing/stashing
+- 🔧 **Reusable extensions** - Pre-built tool fragments (fzf, uv, nodejs, etc.)
+- 🐳 **Docker Buildx/Bake** - Parallel builds with advanced caching
+- 🔄 **DOOD/DIND support** - Works with Docker-outside-Docker or Docker-in-Docker
+- 🎯 **Simple CLI** - One command to enter any repo@branch
+- 🖥️ **Full development environment** - X11, GPU, SSH keys, user mapping
 
-There are two methods of using this project.  
+## Quick Start
 
-1. Use github to use this project as a template
-2. Clone the project and run, `scripts/update_from_template.sh` and then run the `scripts/rename_project.sh` to rename the project.
-
-If you want to use docker you may want to run the `scripts/setup_host.sh` script.  It will set up docker and nvidia-docker (assuming you are on ubuntu22.04).
-
-If you are using pixi, look at the available tasks in pyproject.toml  If you are new to pixi follow the instructions on the pixi [website](https://prefix.dev/)
-
-# Github setup
-
-There are github workflows for CI, codecov and automated pypi publishing in `ci.yml` and `publish.yml`.
-
-ci.yml uses pixi tasks to set up the environment matrix and run the various CI tasks. To set up codecov on github, you need to get a `CODECOV_TOKEN` and add it to your actions secrets.
-
-publish.yml uses [pypy-auto-publish](https://github.com/marketplace/actions/python-auto-release-pypi-github) to automatically publish to pypi if the package version number changes. You need to add a `PYPI_API_TOKEN` to your github secrets to enable this.     
-
-
-# Usage
-
-There are currently two ways of running code.  The preferred way is to use pixi to manage your environment and dependencies. 
+### Installation
 
 ```bash
-cd project
+# Install with pixi (recommended for development)
+pixi install
 
-$pixi run ci
-pixi run arbitrary_task
+# Or install with pip
+pip install dbw
 ```
 
-If you have dependencies or configuration that cannot be managed by pixi, you can use alternative tools:
-
-- [rockerc](https://github.com/blooop/rockerc): A command-line tool for dynamically creating docker containers with access to host resources such as GPU and 
-- [rockervsc](https://github.com/blooop/rockervsc): A Visual Studio Code extension that integrates rockerc functionality into [vscode remote containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
-
-These tools help you create isolated environments with specific dependencies, ensuring consistent setups across different machines.
+### Basic Usage
 
 ```bash
-cd project_name
+# Launch development environment
+dbw launch blooop/python_template@main
 
-rockerc # build and launch container with dependencies set up
-# OR
-rockervsc # build container, launch and attach vscode to that container.
+# With extensions
+dbw launch blooop/python_template@main --with fzf,uv
 
-#once you are inside the container you can use the pixi workflows.
+# Work in subfolder
+dbw launch osrf/rocker@main#examples
+
+# Run single command
+dbw launch blooop/python_template@main git status
+
+# Switch branches (creates new isolated environment)
+dbw launch blooop/python_template@feature/new-feature
+
+# List active environments  
+dbw list
+
+# Clean up
+dbw destroy blooop/python_template@main
+dbw prune --days 7
+```
+
+## How It Works
+
+DBW creates isolated development environments using:
+
+1. **Git Worktrees** - Each branch gets its own directory, no conflicts
+2. **Docker Compose** - Customizable container configuration per repo
+3. **Buildx Cache** - Extension images cached globally, instant reuse
+4. **Bake Files** - Parallel builds of base + extensions
+
+### Example Workflow
+
+```bash
+# First time - clones repo, builds container
+dbw launch myuser/myrepo@main --with fzf,uv
+# Inside container: full development environment ready
+
+# Switch to feature branch - new worktree, reuses cached extensions  
+dbw launch myuser/myrepo@feature/auth
+# Inside container: different code, same tools, no rebuild time
+
+# Work on different repo - reuses all cached extensions
+dbw launch other/repo@main --with fzf,uv  
+# Inside container: extensions already built, immediate startup
+```
+
+## CLI Reference
+
+### Commands
+
+```bash
+dbw launch <owner>/<repo>[@branch][#subfolder] [command]  # Launch environment
+dbw destroy <owner>/<repo>[@branch]                       # Remove environment  
+dbw list                                                  # List active environments
+dbw prune [--days N]                                      # Clean old images/volumes
+dbw ext add <name> <source>                               # Add extension
+dbw ext rm <name>                                         # Remove extension
+dbw ext list                                              # List extensions
+dbw doctor                                                # Run diagnostics
+dbw update                                                # Update base images
+```
+
+### Flags
+
+```bash
+--with <ext1,ext2>    # Comma-separated extensions
+--rebuild             # Force rebuild images  
+--no-gui              # Disable X11 forwarding
+--no-gpu              # Disable GPU support
+--verbose             # Enable verbose logging
+```
+
+## Development
+
+This project uses [pixi](https://pixi.sh) for dependency management and task automation.
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/blooop/dbw.git
+cd dbw
+
+# Install dependencies
+pixi install
+
+# Run tests
+pixi run test
+
+# Run full CI suite
 pixi run ci
 ```
 
-## Legacy
+### Available Tasks
 
-If you don't want to install rocker on your system but want to use vscode, you can run the `scripts/launch_vscode.sh` script to build and connect to a docker container. It will install rocker in a venv.  The docker container is dynamically generated using [rocker](https://github.com/osrf/rocker) and [deps rocker](https://github.com/blooop/deps_rocker).  [deps rocker](https://github.com/blooop/deps_rocker) looks at the dbw.deps.yaml file to install any required apt, pip or shell scripts and launches a container that vscode attaches to. 
+```bash
+pixi run test          # Run tests
+pixi run coverage      # Run tests with coverage
+pixi run format        # Format code with ruff
+pixi run lint          # Lint code
+pixi run mypy          # Type check
+pixi run ci            # Run full CI pipeline
+pixi run fix           # Auto-fix formatting and linting issues
+```
+
+### Docker Integration
+
+DBW includes Docker templates and extensions:
+
+- `templates/` - Base Dockerfile and Compose templates
+- `extensions/` - Sample extensions (fzf, uv)
+- `docker-compose.dind.yml` - Docker-in-Docker support
+- `scripts/docker-setup.sh` - Docker setup automation
+
+## Configuration
+
+### Repository Configuration (`.dbw.yml`)
+
+```yaml
+# .dbw.yml - Checked into your repository
+extensions:
+  - fzf
+  - uv
+  - nodejs
+
+subfolder: src
+
+platforms:
+  - linux/amd64
+  - linux/arm64
+
+base_image: dbw/ubuntu-base:22.04
+
+env:
+  PYTHONPATH: /workspace/src
+  NODE_ENV: development
+
+volumes:
+  - ~/.aws:/home/dev/.aws:ro
+
+ports:
+  - "3000:3000"
+  - "8000:8000"
+```
+
+## Extensions
+
+Built-in extensions include:
+- **fzf** - Fuzzy finder with ripgrep, fd, bat integration
+- **uv** - Fast Python package manager and environment management
+
+### Creating Custom Extensions
+
+```bash
+# Create extension directory
+mkdir -p ~/.local/share/dbw/extensions/myext
+
+# Add to DBW
+dbw ext add myext path/to/myext
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DBW_BASE_IMAGE` | `dbw/ubuntu-base:latest` | Default base image |
+| `DBW_CACHE_TYPE` | `local` | Cache backend: local, registry, inline |
+| `DBW_CACHE_REGISTRY` | | Registry URL for cache |
+| `DBW_BUILDX_BUILDER` | `dbw_builder` | Buildx builder name |
 
 ## Troubleshooting
 
-The main pixi tasks are related to CI.  Github actions runs the pixi task "ci".  The CI is mostly likely to fail from a lockfile mismatch.  Use `pixi run fix` to fix any lockfile related problems. 
+### Common Issues
 
-## vscode tasks
+**Container fails to start**
+```bash
+# Check Docker availability
+dbw doctor
 
-There are two core tasks.  
+# Check logs
+docker logs dbw_myrepo_main_dev
+```
 
-1. set \<cfg\> from active file
+**Permission denied on Docker socket**
+```bash
+# Add user to docker group
+sudo usermod -aG docker $USER
+# Logout and login again
+```
 
-    This sets \<cfg\> to the currently opened file in the editor
+**Extensions not loading**
+```bash
+# List available extensions
+dbw ext list
 
-2. run \<cfg\>
+# Validate extension
+docker compose -f ~/.local/share/dbw/extensions/myext/docker-compose.fragment.yml config
+```
 
-    This runs python with the file set in \<cfg\>
+## Contributing
+
+We welcome contributions! Please see the existing project structure and CI setup.
+
+### Development Guidelines
+
+- Use pixi for dependency management
+- Follow existing code style (ruff, black)
+- Add tests for new functionality
+- Update documentation as needed
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.

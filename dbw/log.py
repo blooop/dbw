@@ -3,8 +3,6 @@
 import logging
 import sys
 from datetime import datetime
-from pathlib import Path
-from typing import Any
 
 import structlog
 from rich.console import Console
@@ -15,11 +13,11 @@ from .config import get_logs_dir
 
 def setup_logging(verbose: bool = False) -> structlog.BoundLogger:
     """Setup structured logging with file and console output."""
-    
+
     # Ensure logs directory exists
     logs_dir = get_logs_dir()
     logs_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Configure standard library logging
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -37,7 +35,7 @@ def setup_logging(verbose: bool = False) -> structlog.BoundLogger:
         ],
         format="%(message)s",
     )
-    
+
     # Configure structlog
     structlog.configure(
         processors=[
@@ -49,14 +47,16 @@ def setup_logging(verbose: bool = False) -> structlog.BoundLogger:
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer() if not sys.stderr.isatty() else structlog.dev.ConsoleRenderer(),
+            structlog.processors.JSONRenderer()
+            if not sys.stderr.isatty()
+            else structlog.dev.ConsoleRenderer(),
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-    
+
     return structlog.get_logger("dbw")
 
 
