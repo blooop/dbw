@@ -1,0 +1,35 @@
+# UV (Fast Python package manager) extension for dbw
+# Adds the fast Python package installer and resolver
+
+version: '3.8'
+
+services:
+  dev:
+    environment:
+      # UV configuration
+      UV_CACHE_DIR: /home/dev/.cache/uv
+      UV_PYTHON_PREFERENCE: only-managed
+      UV_PROJECT_ENVIRONMENT: /workspace/.venv
+      
+      # Python environment
+      PYTHONPATH: /workspace/src:/workspace
+      VIRTUAL_ENV: /workspace/.venv
+      PATH: /workspace/.venv/bin:/home/dev/.local/bin:$PATH
+      
+      # Python development
+      PYTHONDONTWRITEBYTECODE: 1
+      PYTHONUNBUFFERED: 1
+      PIP_NO_CACHE_DIR: 1
+      PIP_DISABLE_PIP_VERSION_CHECK: 1
+    
+    volumes:
+      # Persist UV cache
+      - uv_cache:/home/dev/.cache/uv
+      # Persist Python installations
+      - uv_python:/home/dev/.local/share/uv/python
+
+volumes:
+  uv_cache:
+    external: false
+  uv_python:
+    external: false

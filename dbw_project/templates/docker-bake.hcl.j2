@@ -1,0 +1,117 @@
+# Docker Bake file template for dbw
+# This file is generated automatically by dbw - do not edit manually
+
+variable "PLATFORM" {
+  default = "{{ platform | default('linux/amd64') }}"
+}
+
+variable "CACHE_DIR" {
+  default = "{{ cache_dir }}"
+}
+
+variable "REGISTRY" {
+  default = "{{ registry | default('') }}"
+}
+
+variable "TAG_PREFIX" {
+  default = "{{ tag_prefix | default('dbw') }}"
+}
+
+# Base development image target
+target "base" {
+  context = "{{ context_path }}"
+  dockerfile = "{{ dockerfile_path | default('Dockerfile') }}"
+  tags = ["${var.TAG_PREFIX}_base_{{ project_name }}:latest"]
+  platforms = [var.PLATFORM]
+  
+  {% if cache_type == "local" -%}
+  cache-from = ["type=local,src=${var.CACHE_DIR}"]
+  cache-to = ["type=local,dest=${var.CACHE_DIR},mode=max"]
+  {% elif cache_type == "registry" and registry -%}
+  cache-from = ["type=registry,ref=${var.REGISTRY}/{{ project_name }}_base_cache"]
+  cache-to = ["type=registry,ref=${var.REGISTRY}/{{ project_name }}_base_cache,mode=max"]
+  {% elif cache_type == "inline" -%}
+  cache-from = ["type=inline"]
+  cache-to = ["type=inline,mode=max"]
+  {% endif -%}
+  
+  args = {
+    BUILDKIT_INLINE_CACHE = "1"
+    USER_ID = "{{ user_id | default('1000') }}"
+    GROUP_ID = "{{ group_id | default('1000') }}"
+    USERNAME = "{{ username | default('dev') }}"
+  }
+  
+  labels = {
+    "dbw.version" = "{{ version | default('0.1.0') }}"
+    "dbw.project" = "{{ project_name }}"
+    "dbw.type" = "base"
+    "dbw.timestamp" = "{{ timestamp }}"
+  }
+}
+
+{% for extension in extensions %}
+# Extension: {{ extension.name }}
+target "ext_{{ extension.name }}" {
+  context = "{{ extension.context_path }}"
+  dockerfile = "{{ extension.dockerfile_path | default('Dockerfile') }}"
+  tags = ["${var.TAG_PREFIX}_ext_{{ extension.name }}:{{ extension.hash }}"]
+  platforms = [var.PLATFORM]
+  
+  {% if cache_type == "local" -%}
+  cache-from = ["type=local,src=${var.CACHE_DIR}"]
+  cache-to = ["type=local,dest=${var.CACHE_DIR},mode=max"]
+  {% elif cache_type == "registry" and registry -%}
+  cache-from = ["type=registry,ref=${var.REGISTRY}/ext_{{ extension.name }}_cache"]
+  cache-to = ["type=registry,ref=${var.REGISTRY}/ext_{{ extension.name }}_cache,mode=max"]
+  {% elif cache_type == "inline" -%}
+  cache-from = ["type=inline"]
+  cache-to = ["type=inline,mode=max"]
+  {% endif -%}
+  
+  args = {
+    BUILDKIT_INLINE_CACHE = "1"
+    {% for key, value in extension.build_args.items() -%}
+    {{ key }} = "{{ value }}"
+    {% endfor -%}
+  }
+  
+  labels = {
+    "dbw.version" = "{{ version | default('0.1.0') }}"
+    "dbw.extension" = "{{ extension.name }}"
+    "dbw.type" = "extension"
+    "dbw.hash" = "{{ extension.hash }}"
+    "dbw.timestamp" = "{{ timestamp }}"
+  }
+}
+{% endfor %}
+
+# Group for building all targets in parallel
+group "all" {
+  targets = [
+    "base"{% for extension in extensions %},
+    "ext_{{ extension.name }}"{% endfor %}
+  ]
+}
+
+# Group for building only extensions
+group "extensions" {
+  targets = [{% for extension in extensions %}
+    "ext_{{ extension.name }}"{% if not loop.last %},{% endif %}{% endfor %}
+  ]
+}
+
+# Group for building only the base image
+group "base-only" {
+  targets = ["base"]
+}
+
+{% if multi_platform %}
+# Multi-platform group
+group "multi-platform" {
+  targets = [
+    "base"{% for extension in extensions %},
+    "ext_{{ extension.name }}"{% endfor %}
+  ]
+}
+{% endif %}

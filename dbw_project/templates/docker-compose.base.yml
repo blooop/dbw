@@ -1,0 +1,60 @@
+# Base Docker Compose template for dbw
+# This file is used as a template and will be customized per environment
+
+version: '3.8'
+
+x-common-volumes: &common-volumes
+  - type: bind
+    source: .
+    target: /workspace
+  - type: bind
+    source: /var/run/docker.sock
+    target: /var/run/docker.sock
+  - type: bind
+    source: ${HOME}/.ssh
+    target: /home/dev/.ssh
+    read_only: true
+
+x-common-environment: &common-environment
+  TERM: xterm-256color
+  COLORTERM: truecolor
+  USER: dev
+  HOME: /home/dev
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+        USERNAME: ${USERNAME:-dev}
+    container_name: ${COMPOSE_PROJECT_NAME}_dev
+    hostname: dbw-${COMPOSE_PROJECT_NAME}
+    working_dir: /workspace
+    volumes: *common-volumes
+    environment: *common-environment
+    stdin_open: true
+    tty: true
+    network_mode: bridge
+    restart: unless-stopped
+    
+    # Security
+    cap_add:
+      - SYS_PTRACE  # For debugging
+    security_opt:
+      - seccomp:unconfined
+    
+    # Resource limits (can be overridden)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+
+networks:
+  default:
+    name: dbw_default
+    external: false

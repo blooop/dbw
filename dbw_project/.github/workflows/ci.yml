@@ -1,0 +1,339 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.6.1"
+
+jobs:
+  lint-and-format:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --with dev
+
+      - name: Check code formatting with black
+        run: poetry run black --check .
+
+      - name: Lint with ruff
+        run: poetry run ruff check .
+
+      - name: Type check with mypy
+        run: poetry run mypy src/dbw
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --with dev
+
+      - name: Run unit tests
+        run: poetry run pytest tests/unit -v --cov=src/dbw --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == env.PYTHON_VERSION
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:24-dind
+        options: --privileged
+        ports:
+          - 2376:2376
+        env:
+          DOCKER_TLS_CERTDIR: ""
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --with dev
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Wait for Docker daemon
+        run: |
+          timeout=60
+          while ! docker info > /dev/null 2>&1; do
+            echo "Waiting for Docker daemon..."
+            sleep 2
+            timeout=$((timeout - 2))
+            if [[ $timeout -le 0 ]]; then
+              echo "Docker daemon failed to start"
+              exit 1
+            fi
+          done
+          echo "Docker daemon is ready"
+          docker info
+
+      - name: Run integration tests
+        run: poetry run pytest tests/integration -v -m integration
+        env:
+          DOCKER_HOST: tcp://localhost:2376
+
+  build-test:
+    name: Build Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Build package
+        run: poetry build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/
+
+      - name: Test installation
+        run: |
+          python -m pip install dist/*.whl
+          dbw --version
+
+  docker-tests:
+    name: Docker Tests
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:24-dind
+        options: --privileged
+        ports:
+          - 2376:2376
+        env:
+          DOCKER_TLS_CERTDIR: ""
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Wait for Docker daemon
+        run: |
+          timeout=60
+          while ! docker info > /dev/null 2>&1; do
+            echo "Waiting for Docker daemon..."
+            sleep 2
+            timeout=$((timeout - 2))
+            if [[ $timeout -le 0 ]]; then
+              echo "Docker daemon failed to start"
+              exit 1
+            fi
+          done
+
+      - name: Test Docker setup script
+        run: |
+          chmod +x scripts/docker-setup.sh
+          ./scripts/docker-setup.sh status
+
+      - name: Test Docker-in-Docker setup
+        run: |
+          ./scripts/docker-setup.sh dind
+          docker ps
+
+      - name: Test base image build
+        run: |
+          docker buildx build \
+            --tag dbw-base-test:latest \
+            --file templates/Dockerfile.base \
+            --load \
+            .
+
+      - name: Test extension builds
+        run: |
+          cd extensions/fzf
+          docker buildx build \
+            --tag dbw-ext-fzf:test \
+            --load \
+            .
+          
+          cd ../uv
+          docker buildx build \
+            --tag dbw-ext-uv:test \
+            --load \
+            .
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run safety check
+        run: poetry run safety check --json || true
+
+      - name: Run bandit security linter
+        run: poetry run bandit -r src/dbw -f json || true
+
+  release-check:
+    name: Release Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check version bump
+        run: |
+          # Check if version was bumped in pyproject.toml
+          if git diff HEAD~1..HEAD --name-only | grep -q pyproject.toml; then
+            echo "pyproject.toml changed - checking version bump"
+            # This is a simplified check - in practice you might want more sophisticated version checking
+            git diff HEAD~1..HEAD pyproject.toml | grep -q "+version" && echo "Version bumped" || echo "::warning::Version may need to be bumped"
+          fi
+
+  all-checks:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, unit-tests, integration-tests, build-test, docker-tests, security]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.lint-and-format.result }}" != "success" ]]; then
+            echo "Lint and format checks failed"
+            exit 1
+          fi
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+            echo "Unit tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+            echo "Integration tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.build-test.result }}" != "success" ]]; then
+            echo "Build test failed"
+            exit 1
+          fi
+          if [[ "${{ needs.docker-tests.result }}" != "success" ]]; then
+            echo "Docker tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.security.result }}" != "success" ]]; then
+            echo "Security checks failed"
+            exit 1
+          fi
+          echo "All checks passed!"

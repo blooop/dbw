@@ -1,0 +1,114 @@
+# Docker-in-Docker support for dbw
+# Use this compose file when the host doesn't have Docker socket access
+# or when running in CI/container environments
+
+version: '3.8'
+
+services:
+  # Docker-in-Docker daemon
+  docker-daemon:
+    image: docker:24-dind
+    container_name: dbw_docker_daemon
+    privileged: true
+    restart: unless-stopped
+    command:
+      - dockerd
+      - --host=unix:///var/run/docker.sock
+      - --host=tcp://0.0.0.0:2376
+      - --tlsverify=false
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      # Persistent storage for Docker data
+      - docker_data:/var/lib/docker
+      # Shared socket for DOOD-style access
+      - docker_socket:/var/run
+      # Cache directory for BuildKit
+      - buildx_cache:/root/.cache/buildx
+    networks:
+      - dbw_dind
+    ports:
+      - "2376:2376"  # Docker API (insecure for local dev)
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # BuildKit builder service (optional, for advanced builds)
+  buildkit:
+    image: moby/buildkit:latest
+    container_name: dbw_buildkit
+    privileged: true
+    restart: unless-stopped
+    volumes:
+      - buildx_cache:/root/.cache/buildx
+      - docker_socket:/var/run
+    networks:
+      - dbw_dind
+    depends_on:
+      docker-daemon:
+        condition: service_healthy
+    environment:
+      BUILDKITD_FLAGS: "--oci-worker-no-process-sandbox"
+
+  # DBW development environment using DinD
+  dbw-dev:
+    build:
+      context: .
+      dockerfile: templates/Dockerfile.base
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+        USERNAME: ${USERNAME:-dev}
+    container_name: dbw_dev_dind
+    hostname: dbw-dind
+    working_dir: /workspace
+    depends_on:
+      docker-daemon:
+        condition: service_healthy
+    environment:
+      # Point to DinD daemon
+      DOCKER_HOST: tcp://docker-daemon:2376
+      # Disable TLS for local development
+      DOCKER_TLS_VERIFY: 0
+      # Standard development environment
+      TERM: xterm-256color
+      COLORTERM: truecolor
+    volumes:
+      # Mount workspace
+      - .:/workspace
+      # Share Docker socket from DinD
+      - docker_socket:/var/run
+      # SSH and X11 forwarding (if available)
+      - ${HOME}/.ssh:/home/dev/.ssh:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/home/dev/.Xauthority:ro
+    networks:
+      - dbw_dind
+    stdin_open: true
+    tty: true
+    # GPU support (if available on host)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  # Persistent Docker data
+  docker_data:
+    external: false
+  # Shared Docker socket
+  docker_socket:
+    external: false
+  # BuildKit cache
+  buildx_cache:
+    external: false
+
+networks:
+  dbw_dind:
+    external: false

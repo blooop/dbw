@@ -1,0 +1,129 @@
+# Base Dockerfile template for dbw development environments
+# This provides a Ubuntu-based development environment with common tools
+
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Create build arguments for user setup
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+ARG USERNAME=dev
+
+# Install base system packages
+RUN apt-get update && apt-get install -y \
+    # Core utilities
+    curl \
+    wget \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    apt-transport-https \
+    # Development tools
+    git \
+    git-lfs \
+    vim \
+    nano \
+    build-essential \
+    pkg-config \
+    # Shell and terminal
+    bash \
+    bash-completion \
+    tmux \
+    screen \
+    # Network tools
+    netcat-openbsd \
+    iputils-ping \
+    dnsutils \
+    # Archive tools
+    unzip \
+    zip \
+    tar \
+    gzip \
+    # Process tools
+    htop \
+    ps \
+    tree \
+    # Python
+    python3 \
+    python3-pip \
+    python3-dev \
+    python3-venv \
+    # Node.js (LTS)
+    nodejs \
+    npm \
+    # Language servers and formatters
+    shellcheck \
+    # X11 and GUI support
+    x11-apps \
+    xauth \
+    # SSH and GPG
+    openssh-client \
+    gnupg2 \
+    # Docker CLI (for Docker-outside-Docker)
+    docker.io \
+    docker-compose \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker Buildx
+RUN mkdir -p /usr/local/lib/docker/cli-plugins && \
+    curl -SL "https://github.com/docker/buildx/releases/latest/download/buildx-v0.12.1.linux-amd64" \
+    -o /usr/local/lib/docker/cli-plugins/docker-buildx && \
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
+# Setup Git LFS
+RUN git lfs install --system
+
+# Create user with same UID/GID as host user
+RUN groupadd -g ${GROUP_ID} ${USERNAME} && \
+    useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /bin/bash ${USERNAME} && \
+    echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    # Add user to docker group for DooD
+    usermod -aG docker ${USERNAME}
+
+# Install common development tools as user
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
+
+# Install pip packages as user
+RUN python3 -m pip install --user --upgrade \
+    pip \
+    setuptools \
+    wheel \
+    # Common Python dev tools
+    black \
+    flake8 \
+    mypy \
+    pytest \
+    ipython \
+    jupyter
+
+# Install common npm packages globally for user
+RUN npm config set prefix '/home/${USERNAME}/.npm-global' && \
+    echo 'export PATH="/home/${USERNAME}/.npm-global/bin:$PATH"' >> /home/${USERNAME}/.bashrc && \
+    export PATH="/home/${USERNAME}/.npm-global/bin:$PATH" && \
+    npm install -g \
+    @prettier/cli \
+    eslint \
+    typescript \
+    ts-node
+
+# Setup shell environment
+RUN echo 'alias ll="ls -alF"' >> /home/${USERNAME}/.bashrc && \
+    echo 'alias la="ls -A"' >> /home/${USERNAME}/.bashrc && \
+    echo 'alias l="ls -CF"' >> /home/${USERNAME}/.bashrc && \
+    echo 'export EDITOR=vim' >> /home/${USERNAME}/.bashrc && \
+    echo 'export TERM=xterm-256color' >> /home/${USERNAME}/.bashrc
+
+# Set up workspace
+WORKDIR /workspace
+
+# Default command
+CMD ["/bin/bash"]
+
+# Labels for identification and cleanup
+LABEL maintainer="dbw"
+LABEL dbw.version="0.1.0"
+LABEL dbw.type="base"
