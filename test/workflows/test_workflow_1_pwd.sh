@@ -2,5 +2,7 @@
 set -e
 cd /tmp
 
-echo "Running: dbw launch blooop/test_dbw launch and confirming the working directory is test_dbw launch to match the name of the git repo"
-dbw launch blooop/test_dbw launch pwd
+rm -rf /home/ags/.local/share/dbw
+
+echo "Running: dbw blooop/test_dbw confirming the working directory is test_dbw to match the name of the git repo"
+dbw blooop/test_dbw pwd

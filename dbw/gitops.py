@@ -58,25 +58,14 @@ def clone_repo(owner: str, repo: str, bare_path: Path) -> git.Repo:
     logger.info("clone.start", owner=owner, repo=repo, path=str(bare_path))
 
     try:
-        # Try SSH first, fallback to HTTPS
-        try:
-            remote_url = get_remote_url(owner, repo, use_ssh=True)
-            git_repo = git.Repo.clone_from(
-                remote_url,
-                bare_path,
-                bare=True,
-                progress=None,
-            )
-        except git.GitCommandError:
-            logger.warning("clone.ssh_failed", fallback="https")
-            remote_url = get_remote_url(owner, repo, use_ssh=False)
-            git_repo = git.Repo.clone_from(
-                remote_url,
-                bare_path,
-                bare=True,
-                progress=None,
-            )
-
+        # Only use SSH for cloning, do not fallback to HTTPS
+        remote_url = get_remote_url(owner, repo, use_ssh=True)
+        git_repo = git.Repo.clone_from(
+            remote_url,
+            bare_path,
+            bare=True,
+            progress=None,
+        )
         logger.info("clone.success", path=str(bare_path))
         return git_repo
 
@@ -101,6 +90,10 @@ def ensure_bare_repo(owner: str, repo: str) -> git.Repo:
             if not git_repo.bare:
                 raise GitError(f"Repository at {bare_path} is not bare")
 
+            # Ensure 'origin' remote exists
+            if "origin" not in [remote.name for remote in git_repo.remotes]:
+                git_repo.create_remote("origin", url=str(bare_path))
+
             # Fetch latest changes
             logger.info("fetch.start", path=str(bare_path))
             git_repo.remotes.origin.fetch(prune=True)
@@ -114,7 +107,11 @@ def ensure_bare_repo(owner: str, repo: str) -> git.Repo:
 
     # Clone if doesn't exist or was corrupted
     bare_path.parent.mkdir(parents=True, exist_ok=True)
-    return clone_repo(owner, repo, bare_path)
+    git_repo = clone_repo(owner, repo, bare_path)
+    # Ensure 'origin' remote exists after clone
+    if "origin" not in [remote.name for remote in git_repo.remotes]:
+        git_repo.create_remote("origin", url=str(bare_path))
+    return git_repo
 
 
 def ensure_worktree(git_repo: git.Repo, repo: str, branch: str) -> Path:

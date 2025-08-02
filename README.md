@@ -36,20 +36,21 @@ pip install dbw
 ### Basic Usage
 
 ```bash
-# Launch development environment
-dbw launch blooop/python_template@main
+
+# Start development environment and run commands
+dbw blooop/python_template@main
 
 # With extensions
-dbw launch blooop/python_template@main --with fzf,uv
+dbw blooop/python_template@main --with fzf,uv
 
 # Work in subfolder
-dbw launch osrf/rocker@main#examples
+dbw osrf/rocker@main#examples
 
 # Run single command
-dbw launch blooop/python_template@main git status
+dbw blooop/python_template@main git status
 
 # Switch branches (creates new isolated environment)
-dbw launch blooop/python_template@feature/new-feature
+dbw blooop/python_template@feature/new-feature
 
 # List active environments  
 dbw list
@@ -72,15 +73,15 @@ DBW creates isolated development environments using:
 
 ```bash
 # First time - clones repo, builds container
-dbw launch myuser/myrepo@main --with fzf,uv
+dbw myuser/myrepo@main --with fzf,uv
 # Inside container: full development environment ready
 
 # Switch to feature branch - new worktree, reuses cached extensions  
-dbw launch myuser/myrepo@feature/auth
+dbw myuser/myrepo@feature/auth
 # Inside container: different code, same tools, no rebuild time
 
 # Work on different repo - reuses all cached extensions
-dbw launch other/repo@main --with fzf,uv  
+dbw other/repo@main --with fzf,uv  
 # Inside container: extensions already built, immediate startup
 ```
 
@@ -89,15 +90,15 @@ dbw launch other/repo@main --with fzf,uv
 ### Commands
 
 ```bash
-dbw launch <owner>/<repo>[@branch][#subfolder] [command]  # Launch environment
-dbw destroy <owner>/<repo>[@branch]                       # Remove environment  
-dbw list                                                  # List active environments
-dbw prune [--days N]                                      # Clean old images/volumes
-dbw ext add <name> <source>                               # Add extension
-dbw ext rm <name>                                         # Remove extension
-dbw ext list                                              # List extensions
-dbw doctor                                                # Run diagnostics
-dbw update                                                # Update base images
+dbw <owner>/<repo>[@branch][#subfolder] [command]  # Start environment and run command
+dbw destroy <owner>/<repo>[@branch]                # Remove environment  
+dbw list                                           # List active environments
+dbw prune [--days N]                               # Clean old images/volumes
+dbw ext add <name> <source>                        # Add extension
+dbw ext rm <name>                                  # Remove extension
+dbw ext list                                       # List extensions
+dbw doctor                                         # Run diagnostics
+dbw update                                         # Update base images
 ```
 
 ### Flags
