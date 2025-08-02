@@ -30,8 +30,8 @@ def test_workflow_3_cmd():
     output = result.stdout.decode() + result.stderr.decode()
     assert result.returncode in (0, 1), f"Workflow 3 cmd failed: {output}"
     assert "On branch" in output, "Expected git status 'On branch' not found in workflow 3 output"
-    assert "/tmp/test_dbw" in output or "test_dbw" in output, (
-        "Expected working directory 'test_dbw' not found in workflow 3 output"
+    assert "/tmp/test_dbw launch" in output or "test_dbw launch" in output, (
+        "Expected working directory 'test_dbw launch' not found in workflow 3 output"
     )
 
 
