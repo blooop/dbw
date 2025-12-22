@@ -4,8 +4,7 @@ A template repo for python projects that is set up using [pixi](https://pixi.sh)
 This has basic setup for
 
 * pylint
-* ruff
-* black
+* ruff (formatting and linting)
 * pytest
 * git-lfs
 * basic github actions ci
@@ -36,6 +35,27 @@ There are two methods of using this project.
 If you want to use docker you may want to run the `scripts/setup_host.sh` script.  It will set up docker and nvidia-docker (assuming you are on ubuntu22.04).
 
 If you are using pixi, look at the available tasks in pyproject.toml  If you are new to pixi follow the instructions on the pixi [website](https://prefix.dev/)
+
+# Claude Code Online Support
+
+This template includes built-in support for [Claude Code](https://docs.claude.com/claude-code) online environment! The `.claude/hooks/SessionStart` script automatically:
+
+- Installs pixi package manager
+- Sets up all project dependencies
+- Configures pre-commit hooks
+- Prepares the development environment
+
+**Quick Start with Claude Code:**
+1. Open this repository in Claude Code online
+2. The environment sets up automatically via the SessionStart hook
+3. Claude can immediately run commands like `pixi run test`, `pixi run lint`, etc.
+
+**Manual activation (if needed):**
+```bash
+source .claude/activate.sh
+```
+
+See [.claude/README.md](.claude/README.md) for detailed information about the Claude Code configuration.
 
 # Github setup
 
@@ -77,7 +97,7 @@ pixi run ci
 
 ## Legacy
 
-If you don't want to install rocker on your system but want to use vscode, you can run the `scripts/launch_vscode.sh` script to build and connect to a docker container. It will install rocker in a venv.  The docker container is dynamically generated using [rocker](https://github.com/osrf/rocker) and [deps rocker](https://github.com/blooop/deps_rocker).  [deps rocker](https://github.com/blooop/deps_rocker) looks at the dbw.deps.yaml file to install any required apt, pip or shell scripts and launches a container that vscode attaches to. 
+If you don't want to install rocker on your system but want to use vscode, you can run the `scripts/launch_vscode.sh` script to build and connect to a docker container. It will install rocker in a venv.  The docker container is dynamically generated using [rocker](https://github.com/osrf/rocker) and the configuration in `rockerc.yaml`. 
 
 ## Troubleshooting
 

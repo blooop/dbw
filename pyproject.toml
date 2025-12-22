@@ -12,12 +12,13 @@ dependencies = []
 Source = "https://github.com/blooop/dbw"
 Home = "https://github.com/blooop/dbw"
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
 [tool.pixi.dependencies]
 python = ">=3.10"
+shellcheck = ">=0.10.0,<0.11"
 
 [tool.pixi.feature.py310.dependencies]
 python = "3.10.*"
@@ -34,13 +35,13 @@ dbw = { path = ".", editable = true }
 
 [project.optional-dependencies]
 test = [
-  "pylint>=3.2.5,<=3.3.7",
-  "pytest-cov>=4.1,<=6.2.1",
-  "pytest>=7.4,<=8.4.1",
-  "hypothesis>=6.104.2,<=6.135.20",
-  "ruff>=0.5.0,<=0.12.1",
-  "coverage>=7.5.4,<=7.9.1",
-  "pre-commit<=4.2.0",
+  "pylint>=3.2.5,<=4.0.4",
+  "pytest-cov>=4.1,<=7.0.0",
+  "pytest>=7.4,<=9.0.1",
+  "hypothesis>=6.104.2,<=6.148.5",
+  "ruff>=0.5.0,<=0.14.7",
+  "coverage>=7.5.4,<=7.12.0",
+  "pre-commit<=4.5.0",
 ]
 
 [build-system]
